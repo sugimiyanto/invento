@@ -63,3 +63,33 @@ export async function updateUserRole(userId: string, role: 'admin' | 'readonly' 
 
   return data
 }
+export async function deleteUser(userId: string) {
+  const supabase = createClient()
+  const { data: { user: currentUser } } = await supabase.auth.getUser()
+
+  // Get user info before deleting for audit log
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('id', userId)
+    .single()
+
+  const { error } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('id', userId)
+
+  if (error) throw error
+
+  if (currentUser) {
+    await createAuditLog({
+      user_id: currentUser.id,
+      action: 'delete',
+      table_name: 'profiles',
+      record_id: userId,
+      changes: { email: profile?.email || 'unknown' }
+    })
+  }
+
+  return true
+}

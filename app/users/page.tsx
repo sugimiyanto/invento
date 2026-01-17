@@ -23,15 +23,18 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Edit } from 'lucide-react';
-import { useUsers, updateUserRole } from '@/lib/hooks/useUsers';
+import { Edit, Trash2 } from 'lucide-react';
+import { useUsers, updateUserRole, deleteUser } from '@/lib/hooks/useUsers';
+import { useAuth } from '@/lib/context/auth-context';
 import { toast } from 'sonner';
 
 export default function UsersPage() {
   const { users, isLoading, refetch } = useUsers();
+  const { user: currentUser } = useAuth();
   const [editingUser, setEditingUser] = useState<any>(null);
   const [selectedRole, setSelectedRole] = useState<'admin' | 'readonly' | 'pending'>('readonly');
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const handleUpdateRole = async () => {
     if (!editingUser) return;
@@ -47,6 +50,24 @@ export default function UsersPage() {
       toast.error('Gagal mengubah peran pengguna. Silakan coba lagi.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async (user: any) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus akses ${user.email}? Pengguna akan kehilangan akses dan harus mendaftar ulang.`)) {
+      return;
+    }
+
+    try {
+      setIsDeleting(user.id);
+      await deleteUser(user.id);
+      toast.success(`Data akses untuk ${user.email} berhasil dihapus.`);
+      refetch();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Gagal menghapus pengguna. Silakan coba lagi.');
+    } finally {
+      setIsDeleting(null);
     }
   };
 
@@ -135,6 +156,7 @@ export default function UsersPage() {
                               size="sm"
                               variant="ghost"
                               onClick={() => openEditDialog(user)}
+                              disabled={isDeleting === user.id}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -190,6 +212,18 @@ export default function UsersPage() {
                             </div>
                           </DialogContent>
                         </Dialog>
+
+                        {currentUser?.id !== user.id && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeleteUser(user)}
+                            disabled={isDeleting === user.id}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
