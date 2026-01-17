@@ -64,32 +64,25 @@ export async function updateUserRole(userId: string, role: 'admin' | 'readonly' 
   return data
 }
 export async function deleteUser(userId: string) {
-  const supabase = createClient()
-  const { data: { user: currentUser } } = await supabase.auth.getUser()
-
-  // Get user info before deleting for audit log
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('email')
-    .eq('id', userId)
-    .single()
-
-  const { error } = await supabase
-    .from('profiles')
-    .delete()
-    .eq('id', userId)
-
-  if (error) throw error
-
-  if (currentUser) {
-    await createAuditLog({
-      user_id: currentUser.id,
-      action: 'delete',
-      table_name: 'profiles',
-      record_id: userId,
-      changes: { email: profile?.email || 'unknown' }
+  try {
+    // Call server API to delete user
+    const response = await fetch('/api/users/delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
     })
-  }
 
-  return true
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to delete user')
+    }
+
+    const data = await response.json()
+    return { data, error: null }
+  } catch (error: any) {
+    console.error('Error deleting user:', error)
+    return { data: null, error: new Error(error.message || 'Failed to delete user') }
+  }
 }

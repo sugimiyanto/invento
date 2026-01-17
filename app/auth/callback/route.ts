@@ -6,16 +6,24 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
 
+  console.log('[Callback] Auth callback received')
+  console.log('[Callback] Origin:', origin)
+  console.log('[Callback] Code present:', !!code)
+  console.log('[Callback] Next:', next)
+
   if (code) {
-    const supabase = await createClient()
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    try {
+      const supabase = await createClient()
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
-    if (error) {
-      console.error('Error exchanging code for session:', error)
-      return NextResponse.redirect(`${origin}/login?error=auth_failed&message=${encodeURIComponent(error.message)}`)
-    }
+      if (error) {
+        console.error('[Callback] Error exchanging code for session:', error)
+        return NextResponse.redirect(`${origin}/login?error=auth_failed&message=${encodeURIComponent(error.message)}`)
+      }
 
-    if (data.user) {
+      if (data.user) {
+        console.log('[Callback] User authenticated:', data.user.email)
+
       // Check if profile exists
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -31,28 +39,38 @@ export async function GET(request: Request) {
           id: data.user.id,
           email: data.user.email!,
           full_name: data.user.user_metadata.full_name || data.user.user_metadata.name || null,
-          role: 'pending', // Default role untuk user baru: pending approval
+          role: 'readonly', // Default role untuk user baru: readonly
         })
 
         if (insertError) {
           console.error('Error creating profile:', insertError)
         }
-      }
-
-      const forwardedHost = request.headers.get('x-forwarded-host')
-      const isLocalEnv = process.env.NODE_ENV === 'development'
-
-      if (isLocalEnv) {
-        return NextResponse.redirect(`${origin}${next}`)
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`)
+      } else if (profileError) {
+        console.warn('[Callback] Error checking profile:', profileError.message)
       } else {
-        return NextResponse.redirect(`${origin}${next}`)
+        console.log('[Callback] Profile found for user:', profile?.email)
       }
+
+        const forwardedHost = request.headers.get('x-forwarded-host')
+        const isLocalEnv = process.env.NODE_ENV === 'development'
+
+        console.log('[Callback] Redirecting to:', next, 'environment:', isLocalEnv ? 'development' : 'production')
+
+        if (isLocalEnv) {
+          return NextResponse.redirect(`${origin}${next}`)
+        } else if (forwardedHost) {
+          return NextResponse.redirect(`https://${forwardedHost}${next}`)
+        } else {
+          return NextResponse.redirect(`${origin}${next}`)
+        }
+      }
+    } catch (err: any) {
+      console.error('[Callback] Unexpected error in callback:', err)
+      return NextResponse.redirect(`${origin}/login?error=callback_error&message=${encodeURIComponent(err?.message || 'Unknown error')}`)
     }
   }
 
   // return the user to an error page with instructions
-  console.error('No code provided or no user in session')
+  console.error('[Callback] No code provided or no user in session')
   return NextResponse.redirect(`${origin}/login?error=auth_failed`)
 }

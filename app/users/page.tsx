@@ -60,12 +60,15 @@ export default function UsersPage() {
 
     try {
       setIsDeleting(user.id);
-      await deleteUser(user.id);
+      const { error } = await deleteUser(user.id);
+
+      if (error) throw error;
+
       toast.success(`Data akses untuk ${user.email} berhasil dihapus.`);
-      refetch();
-    } catch (error) {
+      await refetch();
+    } catch (error: any) {
       console.error('Error deleting user:', error);
-      toast.error('Gagal menghapus pengguna. Silakan coba lagi.');
+      toast.error(`Gagal menghapus pengguna: ${error.message || 'Error tidak diketahui'}`);
     } finally {
       setIsDeleting(null);
     }

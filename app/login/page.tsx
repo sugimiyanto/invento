@@ -12,9 +12,11 @@ export default function LoginPage() {
   const { signInWithGoogle, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
+      setIsRedirecting(true);
       router.push('/');
     }
   }, [isAuthenticated, isLoading, router]);
@@ -23,24 +25,28 @@ export default function LoginPage() {
     try {
       setIsSigningIn(true);
       await signInWithGoogle();
-    } catch (error) {
+      // signInWithGoogle initiates OAuth redirect, page will be left spinning while redirect completes
+    } catch (error: any) {
       console.error('Error signing in:', error);
-      toast.error('Gagal masuk dengan Google. Silakan coba lagi.');
+      const errorMsg = error?.message || 'Gagal masuk dengan Google. Silakan coba lagi.';
+      toast.error(errorMsg);
       setIsSigningIn(false);
     }
   };
 
-  if (isLoading) {
+  // Show redirecting state if already authenticated
+  if (isRedirecting) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Memuat...</p>
+          <p className="text-gray-600">Mengalihkan ke dashboard...</p>
         </div>
       </div>
     );
   }
 
+  // Always show login form, disable button only while loading auth check
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 p-4">
       <Card className="w-full max-w-md shadow-xl">
@@ -64,12 +70,17 @@ export default function LoginPage() {
               onClick={handleGoogleSignIn}
               className="w-full"
               size="lg"
-              disabled={isSigningIn}
+              disabled={isSigningIn || isLoading}
             >
               {isSigningIn ? (
                 <>
                   <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                   Menghubungkan...
+                </>
+              ) : isLoading ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  Memeriksa sesi...
                 </>
               ) : (
                 <>

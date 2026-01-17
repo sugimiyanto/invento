@@ -19,12 +19,18 @@ export function useProducts() {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (error) throw error
-
-      setProducts(data || [])
+      if (error) {
+        console.warn('Error fetching products:', error.message)
+        setProducts([])
+        setError(null) // Jangan set error, biarkan app berjalan normal
+      } else {
+        setProducts(data || [])
+        setError(null)
+      }
     } catch (err) {
-      setError(err as Error)
-      console.error('Error fetching products:', err)
+      console.warn('Error fetching products:', err)
+      setProducts([])
+      setError(null) // Jangan set error, biarkan app berjalan normal
     } finally {
       setIsLoading(false)
     }

@@ -1,17 +1,57 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Setup
+
+### 1. Environment Variables
+
+Create a `.env.local` file in the root directory and add your Supabase credentials:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+#### How to get these values from Supabase:
+
+1. Go to your Supabase project dashboard
+2. Navigate to **Settings → API**
+3. You'll see:
+   - **Project URL** → Copy this as `NEXT_PUBLIC_SUPABASE_URL`
+   - **Anon (public) key** → Copy this as `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - **Service Role (secret) key** → Copy this as `SUPABASE_SERVICE_ROLE_KEY`
+
+⚠️ **Important**: Keep the Service Role key secret. Never commit it to version control.
+
+### 2. Database Setup
+
+Run the SQL setup script in your Supabase project:
+
+1. Go to your Supabase dashboard
+2. Navigate to **SQL Editor**
+3. Create a new query
+4. Copy and paste the contents of `supabase-setup.sql`
+5. Execute the SQL
+
+This will create:
+- `profiles` table with user roles and information
+- `products` table for inventory management
+- `audit_logs` table for tracking changes
+- Row Level Security (RLS) policies
+- Triggers and functions for profile auto-creation
+
 ## Getting Started
 
-First, run the development server:
+Run the development server:
+
+```bash
+make dev
+```
+
+Or use npm directly:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.

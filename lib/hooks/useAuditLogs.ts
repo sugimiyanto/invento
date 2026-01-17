@@ -24,7 +24,7 @@ export function useAuditLogs(limit = 10) {
   const fetchLogs = async () => {
     try {
       setIsLoading(true);
-      
+
       const { data, error } = await supabase
         .from('audit_logs')
         .select(`
@@ -37,11 +37,19 @@ export function useAuditLogs(limit = 10) {
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      if (error) throw error;
-      setLogs(data || []);
+      if (error) {
+        // Jika error karena table tidak ada atau permission, set empty array
+        console.warn('Audit logs tidak tersedia:', error.message);
+        setLogs([]);
+        setError(null); // Jangan set error, biarkan app berjalan normal
+      } else {
+        setLogs(data || []);
+        setError(null);
+      }
     } catch (err) {
-      console.error('Error fetching audit logs:', err);
-      setError(err as Error);
+      console.warn('Error fetching audit logs:', err);
+      setLogs([]); // Set empty array, jangan crash app
+      setError(null); // Jangan set error, biarkan app berjalan normal
     } finally {
       setIsLoading(false);
     }
