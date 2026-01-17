@@ -18,6 +18,7 @@ export default function ImportCSVPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -83,7 +84,20 @@ export default function ImportCSVPage() {
 
     try {
       setImporting(true);
-      await importProducts(validProducts);
+      setProgress(0);
+
+      const chunkSize = 50;
+      const total = validProducts.length;
+      let importedCount = 0;
+
+      // Import in chunks to show progress
+      for (let i = 0; i < total; i += chunkSize) {
+        const chunk = validProducts.slice(i, i + chunkSize);
+        await importProducts(chunk);
+        importedCount += chunk.length;
+        setProgress(Math.round((importedCount / total) * 100));
+      }
+
       toast.success(
         `Berhasil mengimport ${validProducts.length} barang!`
       );
@@ -93,6 +107,7 @@ export default function ImportCSVPage() {
       toast.error('Gagal mengimport barang. Silakan cek format CSV Anda.');
     } finally {
       setImporting(false);
+      setProgress(0);
     }
   };
 
@@ -191,12 +206,27 @@ J008,J009,,2,ANTIMO SIRSAK GOLDEN CAIR 60 M,5000,5200,,5500,5700,,50,Obat`;
                       <span className="font-bold">{invalidCount}</span>
                     </div>
 
+                    {importing && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs font-medium">
+                          <span>Proses Mengimport...</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     <Button
                       className="w-full"
                       onClick={handleImport}
                       disabled={importing || validCount === 0}
                     >
-                      {importing ? 'Mengimport...' : `Import ${validCount} Barang`}
+                      {importing ? `Mengimport (${progress}%)` : `Import ${validCount} Barang`}
                     </Button>
                   </CardContent>
                 </Card>
@@ -221,8 +251,8 @@ J008,J009,,2,ANTIMO SIRSAK GOLDEN CAIR 60 M,5000,5200,,5500,5700,,50,Obat`;
                         <div
                           key={idx}
                           className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${row.valid
-                              ? 'bg-white border-gray-200'
-                              : 'bg-red-50 border-red-200'
+                            ? 'bg-white border-gray-200'
+                            : 'bg-red-50 border-red-200'
                             }`}
                         >
                           {row.valid ? (
