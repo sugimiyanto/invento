@@ -47,16 +47,34 @@ export default function ImportCSVPage() {
               error = error ? `${error}, Nama Barang wajib diisi` : 'Nama Barang wajib diisi';
             }
 
+            const cleanNumber = (val: any) => {
+              if (val === undefined || val === null || val === '') return null;
+              const num = parseFloat(String(val).replace(/[^0-9.-]+/g, ""));
+              return isNaN(num) ? null : num;
+            };
+
+            const cleanInt = (val: any) => {
+              if (val === undefined || val === null || val === '') return 0;
+              const num = parseInt(String(val).replace(/[^0-9-]+/g, ""));
+              return isNaN(num) ? 0 : num;
+            };
+
             return {
-              ...row,
+              kode_barang_lama: row.kode_barang_lama || null,
+              kode_barang_baru: row.kode_barang_baru,
+              keterangan: row.keterangan || null,
+              nomor_data: cleanNumber(row.nomor_data),
+              nama_barang: row.nama_barang,
+              harga_grosir_min: cleanNumber(row.harga_grosir_min),
+              harga_grosir_max: cleanNumber(row.harga_grosir_max),
+              keterangan_harga_grosir: row.keterangan_harga_grosir || null,
+              harga_satuan_min: cleanNumber(row.harga_satuan_min),
+              harga_satuan_max: cleanNumber(row.harga_satuan_max),
+              keterangan_harga_satuan: row.keterangan_harga_satuan || null,
+              stock: cleanInt(row.stock),
+              category: row.category || null,
               valid,
               error,
-              harga_grosir_min: row.harga_grosir_min ? parseFloat(row.harga_grosir_min) : null,
-              harga_grosir_max: row.harga_grosir_max ? parseFloat(row.harga_grosir_max) : null,
-              harga_satuan_min: row.harga_satuan_min ? parseFloat(row.harga_satuan_min) : null,
-              harga_satuan_max: row.harga_satuan_max ? parseFloat(row.harga_satuan_max) : null,
-              stock: row.stock ? parseInt(row.stock) : 0,
-              nomor_data: row.nomor_data ? parseInt(row.nomor_data) : null,
             };
           });
           setPreview(validatedData);
@@ -102,9 +120,9 @@ export default function ImportCSVPage() {
         `Berhasil mengimport ${validProducts.length} barang!`
       );
       router.push('/products');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error importing products:', error);
-      toast.error('Gagal mengimport barang. Silakan cek format CSV Anda.');
+      toast.error(`Gagal mengimport: ${error.message || 'Cek format CSV Anda'}`);
     } finally {
       setImporting(false);
       setProgress(0);
