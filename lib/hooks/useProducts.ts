@@ -171,16 +171,30 @@ export async function deleteProduct(id: string) {
   return true
 }
 
-export async function importProducts(productsData: Partial<Product>[]) {
+export async function importProducts(
+  productsData: Partial<Product>[],
+  strategy: 'skip' | 'replace' = 'skip'
+) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data, error } = await supabase
-    .from('products')
-    .insert(
-      productsData.map((p) => ({ ...p, created_by: user?.id }))
-    )
-    .select()
+  let data, error;
+
+  const dataWithUser = productsData.map((p) => ({ ...p, created_by: user?.id }))
+
+  if (strategy === 'replace') {
+    // Use upsert to replace duplicates
+    ({ data, error } = await supabase
+      .from('products')
+      .upsert(dataWithUser, { onConflict: 'kode_barang_baru' })
+      .select())
+  } else {
+    // Use insert to skip duplicates (already filtered on client)
+    ({ data, error } = await supabase
+      .from('products')
+      .insert(dataWithUser)
+      .select())
+  }
 
   if (error) throw error
 
@@ -190,7 +204,7 @@ export async function importProducts(productsData: Partial<Product>[]) {
       action: 'import',
       table_name: 'products',
       record_id: 'bulk',
-      changes: { count: data.length }
+      changes: { count: data.length, strategy }
     })
   }
 

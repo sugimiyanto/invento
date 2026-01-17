@@ -19,6 +19,7 @@ export default function ImportCSVPage() {
   const [preview, setPreview] = useState<any[]>([]);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [importStrategy, setImportStrategy] = useState<'skip' | 'replace'>('skip');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -33,13 +34,15 @@ export default function ImportCSVPage() {
           const validatedData = results.data.map((row: any) => {
             let error = '';
             let valid = true;
+            let isDuplicate = false;
 
             if (!row.kode_barang_baru) {
               valid = false;
               error = 'Kode Barang Baru wajib diisi';
             } else if (existingKodes.has(row.kode_barang_baru)) {
-              valid = false;
-              error = 'Kode Barang Baru sudah ada di sistem';
+              isDuplicate = true;
+              valid = true; // Mark as valid, will handle based on strategy
+              error = 'Barang sudah ada (akan di-skip atau timpa)';
             }
 
             if (!row.nama_barang) {
@@ -75,6 +78,7 @@ export default function ImportCSVPage() {
               category: row.category || null,
               valid,
               error,
+              isDuplicate,
             };
           });
           setPreview(validatedData);
@@ -93,7 +97,16 @@ export default function ImportCSVPage() {
   const handleImport = async () => {
     if (!file || preview.length === 0) return;
 
-    const validProducts = preview.filter((p) => p.valid).map(({ valid, error, ...data }) => data);
+    // Filter based on strategy
+    let validProducts = preview.filter((p) => p.valid);
+
+    if (importStrategy === 'skip') {
+      // Remove duplicates when skipping
+      validProducts = validProducts.filter((p) => !p.isDuplicate);
+    }
+    // If 'replace', include everything (duplicates will be updated)
+
+    validProducts = validProducts.map(({ valid, error, isDuplicate, ...data }) => data);
 
     if (validProducts.length === 0) {
       toast.error('Tidak ada data valid yang bisa diimport.');
@@ -111,7 +124,7 @@ export default function ImportCSVPage() {
       // Import in chunks to show progress
       for (let i = 0; i < total; i += chunkSize) {
         const chunk = validProducts.slice(i, i + chunkSize);
-        await importProducts(chunk);
+        await importProducts(chunk, importStrategy);
         importedCount += chunk.length;
         setProgress(Math.round((importedCount / total) * 100));
       }
@@ -208,7 +221,7 @@ J008,J009,,2,ANTIMO SIRSAK GOLDEN CAIR 60 M,5000,5200,,5500,5700,,50,Obat`;
               {preview.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Ringkasan</CardTitle>
+                    <CardTitle>Ringkasan & Opsi</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex justify-between items-center text-sm">
@@ -223,6 +236,44 @@ J008,J009,,2,ANTIMO SIRSAK GOLDEN CAIR 60 M,5000,5200,,5500,5700,,50,Obat`;
                       <span className="text-red-600 font-medium">Bermasalah:</span>
                       <span className="font-bold">{invalidCount}</span>
                     </div>
+
+                    {preview.some(p => p.isDuplicate) && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-sm font-medium text-gray-700 mb-3">
+                          Pilih cara menangani data yang sudah ada:
+                        </p>
+                        <div className="space-y-2">
+                          <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50" style={{ borderColor: importStrategy === 'skip' ? '#3b82f6' : undefined, backgroundColor: importStrategy === 'skip' ? '#eff6ff' : undefined }}>
+                            <input
+                              type="radio"
+                              name="strategy"
+                              value="skip"
+                              checked={importStrategy === 'skip'}
+                              onChange={(e) => setImportStrategy(e.target.value as 'skip' | 'replace')}
+                              className="w-4 h-4"
+                            />
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">Skip (Abaikan)</p>
+                              <p className="text-xs text-gray-500">Jika data sudah ada, akan dilewati</p>
+                            </div>
+                          </label>
+                          <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50" style={{ borderColor: importStrategy === 'replace' ? '#3b82f6' : undefined, backgroundColor: importStrategy === 'replace' ? '#eff6ff' : undefined }}>
+                            <input
+                              type="radio"
+                              name="strategy"
+                              value="replace"
+                              checked={importStrategy === 'replace'}
+                              onChange={(e) => setImportStrategy(e.target.value as 'skip' | 'replace')}
+                              className="w-4 h-4"
+                            />
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">Timpa (Replace)</p>
+                              <p className="text-xs text-gray-500">Jika data sudah ada, akan diperbarui</p>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    )}
 
                     {importing && (
                       <div className="space-y-2">
@@ -268,22 +319,30 @@ J008,J009,,2,ANTIMO SIRSAK GOLDEN CAIR 60 M,5000,5200,,5500,5700,,50,Obat`;
                       {preview.map((row, idx) => (
                         <div
                           key={idx}
-                          className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${row.valid
-                            ? 'bg-white border-gray-200'
-                            : 'bg-red-50 border-red-200'
+                          className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${!row.valid
+                            ? 'bg-red-50 border-red-200'
+                            : row.isDuplicate
+                            ? 'bg-yellow-50 border-yellow-200'
+                            : 'bg-white border-gray-200'
                             }`}
                         >
-                          {row.valid ? (
-                            <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
-                          ) : (
+                          {!row.valid ? (
                             <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                          ) : row.isDuplicate ? (
+                            <AlertCircle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
+                          ) : (
+                            <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
                           )}
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-gray-900">
                               {row.kode_barang_baru || '??'} - {row.nama_barang || 'Tanpa Nama'}
                             </p>
                             {row.error && (
-                              <p className="text-xs text-red-600 mt-0.5">{row.error}</p>
+                              <p className={`text-xs mt-0.5 ${row.isDuplicate ? 'text-yellow-600' : 'text-red-600'}`}>
+                                {row.error}
+                                {row.isDuplicate && importStrategy === 'replace' && ' (akan diperbarui)'}
+                                {row.isDuplicate && importStrategy === 'skip' && ' (akan dilewati)'}
+                              </p>
                             )}
                             <div className="flex gap-4 mt-1 text-[10px] text-gray-500">
                               <span>Stok: {row.stock}</span>

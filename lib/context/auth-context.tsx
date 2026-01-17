@@ -107,7 +107,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               console.log('[Auth] Setting user profile:', profile.email);
               setUser(profile);
             } else {
-              console.log('[Auth] No profile found for user');
+              console.log('[Auth] No profile found for user, but keeping authenticated state');
+              // Keep the user authenticated even if profile fetch fails
+              setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'User',
+                role: 'readonly'
+              } as any);
             }
           } else {
             console.log('[Auth] No session found');
