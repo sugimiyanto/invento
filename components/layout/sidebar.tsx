@@ -23,8 +23,8 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col bg-gray-900 text-white">
       {/* Logo/Brand */}
-      <div className="flex h-16 items-center justify-center border-b border-gray-800 px-6">
-        <h1 className="text-xl font-bold">Invento</h1>
+      <div className="flex h-16 items-center justify-center border-b border-gray-800 px-6 text-center">
+        <h1 className="text-xl font-bold">Invento H. Ulum</h1>
       </div>
 
       {/* Navigation */}

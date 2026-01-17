@@ -54,7 +54,7 @@ export default function PendingApprovalPage() {
               <div>
                 <p className="font-semibold text-blue-900">Langkah Selanjutnya</p>
                 <p className="text-sm text-blue-700 mt-1">
-                  Hubungi administrator untuk mendapatkan akses ke Invento.
+                  Hubungi administrator untuk mendapatkan akses ke Invento H. Ulum.
                   Admin akan mengaktifkan akun Anda dalam waktu dekat.
                 </p>
               </div>

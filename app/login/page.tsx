@@ -49,9 +49,9 @@ export default function LoginPage() {
             <Package className="h-8 w-8 text-white" />
           </div>
           <div>
-            <CardTitle className="text-3xl">Invento</CardTitle>
+            <CardTitle className="text-3xl">Invento H. Ulum</CardTitle>
             <CardDescription className="text-base">
-              Sistem Manajemen Inventori Toko
+              Sistem Manajemen Inventori Toko H. Ulum
             </CardDescription>
           </div>
         </CardHeader>

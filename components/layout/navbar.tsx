@@ -15,7 +15,7 @@ export function Navbar() {
       return 'Barang / Edit';
     if (pathname.startsWith('/products/')) return 'Barang / Detail';
     if (pathname === '/users') return 'Kelola Pengguna';
-    return 'Invento';
+    return 'Invento H. Ulum';
   };
 
   return (

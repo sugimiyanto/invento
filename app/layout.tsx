@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Invento - Inventory Management",
-  description: "Simple inventory management system for your store",
+  title: "Invento H. Ulum - Inventory Management",
+  description: "Sistem Manajemen Inventori Toko H. Ulum",
 };
 
 export default function RootLayout({
