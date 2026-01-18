@@ -23,7 +23,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, CheckCircle } from 'lucide-react';
 import { useUsers, updateUserRole, deleteUser } from '@/lib/hooks/useUsers';
 import { useAuth } from '@/lib/context/auth-context';
 import { toast } from 'sonner';
@@ -42,12 +42,27 @@ export default function UsersPage() {
     try {
       setIsSaving(true);
       await updateUserRole(editingUser.id, selectedRole);
-      toast.success(`Peran pengguna berhasil diubah menjadi ${selectedRole === 'admin' ? 'Admin' : 'Lihat Saja'}`);
+      const roleLabel = selectedRole === 'admin' ? 'Admin' : selectedRole === 'readonly' ? 'Lihat Saja' : 'Menunggu Persetujuan';
+      toast.success(`Peran pengguna berhasil diubah menjadi ${roleLabel}`);
       setEditingUser(null);
       refetch();
     } catch (error) {
       console.error('Error updating user role:', error);
       toast.error('Gagal mengubah peran pengguna. Silakan coba lagi.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleQuickApprove = async (user: any) => {
+    try {
+      setIsSaving(true);
+      await updateUserRole(user.id, 'readonly');
+      toast.success(`${user.email} telah disetujui dan dapat mengakses sistem!`);
+      refetch();
+    } catch (error) {
+      console.error('Error approving user:', error);
+      toast.error('Gagal menyetujui pengguna. Silakan coba lagi.');
     } finally {
       setIsSaving(false);
     }
@@ -153,17 +168,30 @@ export default function UsersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Dialog>
-                          <DialogTrigger asChild>
+                        <div className="flex justify-end gap-1">
+                          {user.role === 'pending' && (
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => openEditDialog(user)}
-                              disabled={isDeleting === user.id}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={() => handleQuickApprove(user)}
+                              disabled={isSaving || isDeleting === user.id}
+                              title="Setujui pengguna ini"
                             >
-                              <Edit className="h-4 w-4" />
+                              <CheckCircle className="h-4 w-4" />
                             </Button>
-                          </DialogTrigger>
+                          )}
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openEditDialog(user)}
+                                disabled={isDeleting === user.id || isSaving}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
                               <DialogTitle>Ubah Peran Pengguna</DialogTitle>
@@ -216,17 +244,18 @@ export default function UsersPage() {
                           </DialogContent>
                         </Dialog>
 
-                        {currentUser?.id !== user.id && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => handleDeleteUser(user)}
-                            disabled={isDeleting === user.id}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                          {currentUser?.id !== user.id && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteUser(user)}
+                              disabled={isDeleting === user.id || isSaving}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

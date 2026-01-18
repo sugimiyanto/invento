@@ -31,6 +31,8 @@ export default function ImportCSVPage() {
         skipEmptyLines: true,
         complete: (results) => {
           const existingKodes = new Set(products.map(p => p.kode_barang_baru));
+          const csvKodes = new Set(); // Track kodes within the CSV to detect duplicates
+
           const validatedData = results.data.map((row: any) => {
             let error = '';
             let valid = true;
@@ -42,7 +44,15 @@ export default function ImportCSVPage() {
             } else if (existingKodes.has(row.kode_barang_baru)) {
               isDuplicate = true;
               valid = true; // Mark as valid, will handle based on strategy
-              error = 'Barang sudah ada (akan di-skip atau timpa)';
+              error = 'Barang sudah ada di database (akan di-skip atau timpa)';
+            } else if (csvKodes.has(row.kode_barang_baru)) {
+              // Duplicate within CSV itself
+              isDuplicate = true;
+              valid = true;
+              error = 'Duplikat di dalam CSV (akan di-skip atau timpa)';
+            } else {
+              // First occurrence, add to set
+              csvKodes.add(row.kode_barang_baru);
             }
 
             if (!row.nama_barang) {

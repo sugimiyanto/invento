@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   email TEXT NOT NULL,
   full_name TEXT,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'readonly', 'pending')) DEFAULT 'readonly',
+  role TEXT NOT NULL CHECK (role IN ('admin', 'readonly', 'pending')) DEFAULT 'pending',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -70,16 +70,27 @@ DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 DROP POLICY IF EXISTS "Admin can manage all profiles" ON profiles;
 DROP POLICY IF EXISTS "Allow profile creation on signup" ON profiles;
 DROP POLICY IF EXISTS "System can delete profiles" ON profiles;
+DROP POLICY IF EXISTS "Admin can update all profiles" ON profiles;
 
 -- Allow users to view their own profile
 CREATE POLICY "Users can view own profile" ON profiles
   FOR SELECT
   USING (auth.uid() = id);
 
--- Allow users to update their own profile
+-- Allow admins to view all profiles
+CREATE POLICY "Admin can view all profiles" ON profiles
+  FOR SELECT
+  USING (public.is_admin(auth.uid()));
+
+-- Allow users to update their own profile (but not their role)
 CREATE POLICY "Users can update own profile" ON profiles
   FOR UPDATE
   USING (auth.uid() = id);
+
+-- Allow admins to update all profiles (including roles)
+CREATE POLICY "Admin can update all profiles" ON profiles
+  FOR UPDATE
+  USING (public.is_admin(auth.uid()));
 
 -- Allow authenticated users to insert their own profile (for signup)
 CREATE POLICY "Allow profile creation on signup" ON profiles
@@ -107,10 +118,17 @@ DROP POLICY IF EXISTS "Admin can insert products" ON products;
 DROP POLICY IF EXISTS "Admin can update products" ON products;
 DROP POLICY IF EXISTS "Admin can delete products" ON products;
 
--- All authenticated users can view products
+-- Only approved users (admin or readonly) can view products - pending users cannot
 CREATE POLICY "Authenticated users can view products" ON products
   FOR SELECT
-  USING (auth.uid() IS NOT NULL);
+  USING (
+    auth.uid() IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = auth.uid()
+      AND role IN ('admin', 'readonly')
+    )
+  );
 
 -- Only admins can insert products
 CREATE POLICY "Admin can insert products" ON products
@@ -169,7 +187,7 @@ BEGIN
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
-    'readonly'
+    'pending'
   );
   RETURN NEW;
 END;

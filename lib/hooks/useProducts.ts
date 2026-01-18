@@ -27,8 +27,13 @@ export function useProducts() {
         setProducts(data || [])
         setError(null)
       }
-    } catch (err) {
-      console.warn('Error fetching products:', err)
+    } catch (err: any) {
+      // Ignore abort errors from HMR
+      if (err?.name === 'AbortError') {
+        console.log('Products fetch aborted (likely HMR)')
+      } else {
+        console.warn('Error fetching products:', err)
+      }
       setProducts([])
       setError(null) // Jangan set error, biarkan app berjalan normal
     } finally {
@@ -184,10 +189,23 @@ export async function importProducts(
 
   if (strategy === 'replace') {
     // Use upsert to replace duplicates
-    ({ data, error } = await supabase
-      .from('products')
-      .upsert(dataWithUser, { onConflict: 'kode_barang_baru' })
-      .select())
+    // Split into separate operations to avoid "ON CONFLICT DO UPDATE command cannot affect row a second time" error
+    const results = []
+    for (const item of dataWithUser) {
+      const { data: result, error: err } = await supabase
+        .from('products')
+        .upsert([item], { onConflict: 'kode_barang_baru' })
+        .select()
+
+      if (err) {
+        console.error('Error upserting product:', err)
+        throw err
+      }
+      if (result) {
+        results.push(...result)
+      }
+    }
+    data = results
   } else {
     // Use insert to skip duplicates (already filtered on client)
     ({ data, error } = await supabase
@@ -203,7 +221,7 @@ export async function importProducts(
       user_id: user.id,
       action: 'import',
       table_name: 'products',
-      record_id: 'bulk',
+      record_id: null,
       changes: { count: data.length, strategy }
     })
   }

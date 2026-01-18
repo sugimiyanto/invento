@@ -46,8 +46,13 @@ export function useAuditLogs(limit = 10) {
         setLogs(data || []);
         setError(null);
       }
-    } catch (err) {
-      console.warn('Error fetching audit logs:', err);
+    } catch (err: any) {
+      // Ignore abort errors from HMR
+      if (err?.name === 'AbortError') {
+        console.log('Audit logs fetch aborted (likely HMR)');
+      } else {
+        console.warn('Error fetching audit logs:', err);
+      }
       setLogs([]); // Set empty array, jangan crash app
       setError(null); // Jangan set error, biarkan app berjalan normal
     } finally {

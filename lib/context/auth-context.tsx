@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 id: userId,
                 email: userEmail || '',
                 full_name: userName || userEmail?.split('@')[0] || 'User',
-                role: 'readonly'
+                role: 'pending'  // User baru harus menunggu approval dari admin
               })
               .select()
               .single();
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               return null;
             }
 
-            console.log('[Auth] Profile baru berhasil dibuat:', newProfile.email);
+            console.log('[Auth] Profile baru berhasil dibuat dengan status pending:', newProfile.email);
             return newProfile;
           }
 
@@ -66,7 +66,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         console.log('[Auth] Profile fetched successfully:', data?.email);
         return data;
-      } catch (err) {
+      } catch (err: any) {
+        // If it's an abort error, don't retry
+        if (err?.name === 'AbortError') {
+          console.log('[Auth] Profile fetch aborted (likely HMR)');
+          return null;
+        }
+
         console.warn(`[Auth] Error fetching profile (attempt ${attempt + 1}):`, err);
 
         // Retry dengan delay jika masih ada attempt tersisa
@@ -84,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize auth state
   useEffect(() => {
     let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: NodeJS.Timeout | null = null;
 
     const initializeAuth = async () => {
       try {
@@ -94,44 +100,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data: { session } } = await supabase.auth.getSession();
         console.log('[Auth] Initial session check:', session ? 'has session' : 'no session');
 
-        if (isMounted) {
-          if (session?.user) {
-            console.log('[Auth] User exists in session:', session.user.email);
-            setSupabaseUser(session.user);
-            const profile = await fetchUserProfile(
-              session.user.id,
-              session.user.email,
-              session.user.user_metadata?.full_name || session.user.user_metadata?.name
-            );
-            if (profile) {
-              console.log('[Auth] Setting user profile:', profile.email);
-              setUser(profile);
-            } else {
-              console.log('[Auth] No profile found for user, but keeping authenticated state');
-              // Keep the user authenticated even if profile fetch fails
-              setUser({
-                id: session.user.id,
-                email: session.user.email || '',
-                full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'User',
-                role: 'readonly'
-              } as any);
-            }
+        if (!isMounted) return;
+
+        if (session?.user) {
+          console.log('[Auth] User exists in session:', session.user.email);
+          setSupabaseUser(session.user);
+          const profile = await fetchUserProfile(
+            session.user.id,
+            session.user.email,
+            session.user.user_metadata?.full_name || session.user.user_metadata?.name
+          );
+          if (profile) {
+            console.log('[Auth] Setting user profile:', profile.email);
+            setUser(profile);
           } else {
-            console.log('[Auth] No session found');
-            setSupabaseUser(null);
-            setUser(null);
+            console.log('[Auth] No profile found for user, but keeping authenticated state');
+            // Keep the user authenticated even if profile fetch fails - default to pending status
+            setUser({
+              id: session.user.id,
+              email: session.user.email || '',
+              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'User',
+              role: 'pending'  // User baru harus menunggu approval dari admin
+            } as any);
           }
-          setIsLoading(false);
+        } else {
+          console.log('[Auth] No session found');
+          setSupabaseUser(null);
+          setUser(null);
         }
-      } catch (err) {
+
+        // Clear timeout and set loading false on successful completion
+        if (timeoutId) clearTimeout(timeoutId);
+        setIsLoading(false);
+      } catch (err: any) {
+        // Ignore abort errors from HMR - these are safe to ignore in dev mode
+        if (err?.name === 'AbortError') {
+          console.log('[Auth] Aborted during initialization (likely HMR) - will retry via onAuthStateChange');
+          // Don't set loading to false - the onAuthStateChange listener will handle it
+          return;
+        }
+
         console.error('[Auth] Error during initialization:', err);
         if (isMounted) {
+          if (timeoutId) clearTimeout(timeoutId);
           setIsLoading(false);
         }
       }
     };
 
-    // Set a timeout as a safety net - max 10 seconds to check session and fetch profile
+    // Set a longer timeout as a safety net - 10 seconds
     timeoutId = setTimeout(() => {
       if (isMounted) {
         console.warn('[Auth] Session check timeout - setting isLoading to false');
@@ -161,13 +178,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(profile);
           } else {
             console.log('[Auth] No profile found for user, but keeping authenticated state');
-            // Keep the user authenticated even if profile fetch fails
+            // Keep the user authenticated even if profile fetch fails - default to pending status
             // The profile will be created or fetched on next attempt
             setUser({
               id: session.user.id,
               email: session.user.email || '',
               full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'User',
-              role: 'readonly'
+              role: 'pending'  // User baru harus menunggu approval dari admin
             } as any);
           }
         } else {
@@ -177,13 +194,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setIsLoading(false);
         // Clear the timeout once we've processed the auth state
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
       }
     );
 
     return () => {
       isMounted = false;
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []);
