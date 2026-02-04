@@ -48,18 +48,30 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Check if user has 'pending' role and trying to access protected pages
-  if (user && !request.nextUrl.pathname.startsWith('/pending-approval')) {
+  // Check if user has 'pending' role and restrict access
+  if (user) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single()
 
-    if (profile?.role === 'pending') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/pending-approval'
-      return NextResponse.redirect(url)
+    // If profile not found, user was deleted - let auth context handle logout
+    if (!profile) {
+      console.log('[Middleware] Profile not found for authenticated user - will be logged out')
+      return supabaseResponse
+    }
+
+    // If user has pending role, only allow access to pending-approval and auth pages
+    if (profile.role === 'pending') {
+      const allowedPaths = ['/pending-approval', '/login', '/auth']
+      const isAllowedPath = allowedPaths.some(path => request.nextUrl.pathname.startsWith(path))
+
+      if (!isAllowedPath) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/pending-approval'
+        return NextResponse.redirect(url)
+      }
     }
   }
 

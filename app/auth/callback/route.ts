@@ -31,24 +31,26 @@ export async function GET(request: Request) {
         .eq('id', data.user.id)
         .single()
 
-      // If no profile exists, create one with default role 'readonly'
+      // If no profile exists, create one with default role 'pending'
       if (!profile && profileError?.code === 'PGRST116') {
         // PGRST116 = not found error
-        console.log('Creating new profile for user:', data.user.email)
+        console.log('[Callback] Creating new profile for user:', data.user.email)
         const { error: insertError } = await supabase.from('profiles').insert({
           id: data.user.id,
           email: data.user.email!,
           full_name: data.user.user_metadata.full_name || data.user.user_metadata.name || null,
-          role: 'readonly', // Default role untuk user baru: readonly
+          role: 'pending', // User baru harus menunggu approval dari admin
         })
 
         if (insertError) {
-          console.error('Error creating profile:', insertError)
+          console.error('[Callback] Error creating profile:', insertError)
+        } else {
+          console.log('[Callback] Profile created with pending role')
         }
       } else if (profileError) {
         console.warn('[Callback] Error checking profile:', profileError.message)
       } else {
-        console.log('[Callback] Profile found for user:', profile?.email)
+        console.log('[Callback] Profile found for user:', profile?.email, 'role:', profile?.role)
       }
 
         const forwardedHost = request.headers.get('x-forwarded-host')

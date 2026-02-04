@@ -22,8 +22,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createClient();
 
-  // Fetch or create user profile from profiles table with retry logic
-  const fetchUserProfile = async (userId: string, userEmail?: string, userName?: string) => {
+  // Fetch user profile from profiles table with retry logic
+  const fetchUserProfile = async (userId: string) => {
     const maxRetries = 3;
     const retryDelay = 500; // ms
 
@@ -37,30 +37,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single();
 
         if (error) {
-          // Profile tidak ada, coba create otomatis (fallback jika trigger belum jalan)
+          // Profile tidak ada - kemungkinan user dihapus oleh admin atau belum dibuat oleh trigger
           if (error.code === 'PGRST116') {
-            console.log('[Auth] Profile tidak ada, membuat profile baru...');
-            const { data: newProfile, error: createError } = await supabase
-              .from('profiles')
-              .insert({
-                id: userId,
-                email: userEmail || '',
-                full_name: userName || userEmail?.split('@')[0] || 'User',
-                role: 'pending'  // User baru harus menunggu approval dari admin
-              })
-              .select()
-              .single();
-
-            if (createError) {
-              console.warn('[Auth] Gagal membuat profile:', createError.message);
-              return null;
-            }
-
-            console.log('[Auth] Profile baru berhasil dibuat dengan status pending:', newProfile.email);
-            return newProfile;
+            console.log('[Auth] Profile tidak ditemukan untuk user ini');
+          } else {
+            console.warn('[Auth] Profile tidak dapat diakses:', error.message);
           }
-
-          console.warn('[Auth] Profile tidak dapat diakses:', error.message);
           return null;
         }
 
@@ -105,23 +87,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           console.log('[Auth] User exists in session:', session.user.email);
           setSupabaseUser(session.user);
-          const profile = await fetchUserProfile(
-            session.user.id,
-            session.user.email,
-            session.user.user_metadata?.full_name || session.user.user_metadata?.name
-          );
+          const profile = await fetchUserProfile(session.user.id);
           if (profile) {
             console.log('[Auth] Setting user profile:', profile.email);
             setUser(profile);
           } else {
-            console.log('[Auth] No profile found for user, but keeping authenticated state');
-            // Keep the user authenticated even if profile fetch fails - default to pending status
-            setUser({
-              id: session.user.id,
-              email: session.user.email || '',
-              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'User',
-              role: 'pending'  // User baru harus menunggu approval dari admin
-            } as any);
+            console.log('[Auth] No profile found - user may have been deleted. Logging out...');
+            // Profile not found - user was likely deleted by admin, force logout
+            await supabase.auth.signOut();
+            setSupabaseUser(null);
+            setUser(null);
           }
         } else {
           console.log('[Auth] No session found');
@@ -168,24 +143,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           console.log('[Auth] User exists in session:', session.user.email);
           setSupabaseUser(session.user);
-          const profile = await fetchUserProfile(
-            session.user.id,
-            session.user.email,
-            session.user.user_metadata?.full_name || session.user.user_metadata?.name
-          );
+          const profile = await fetchUserProfile(session.user.id);
           if (profile) {
             console.log('[Auth] Setting user profile:', profile.email);
             setUser(profile);
           } else {
-            console.log('[Auth] No profile found for user, but keeping authenticated state');
-            // Keep the user authenticated even if profile fetch fails - default to pending status
-            // The profile will be created or fetched on next attempt
-            setUser({
-              id: session.user.id,
-              email: session.user.email || '',
-              full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'User',
-              role: 'pending'  // User baru harus menunggu approval dari admin
-            } as any);
+            console.log('[Auth] No profile found - user may have been deleted. Logging out...');
+            // Profile not found - user was likely deleted by admin, force logout
+            await supabase.auth.signOut();
+            setSupabaseUser(null);
+            setUser(null);
           }
         } else {
           console.log('[Auth] No session found');
