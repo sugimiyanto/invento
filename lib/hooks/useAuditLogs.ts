@@ -6,7 +6,7 @@ export interface AuditLog {
   user_id: string;
   action: 'create' | 'update' | 'delete' | 'import';
   table_name: string;
-  record_id: string;
+  record_id: string | null;
   changes: any;
   created_at: string;
   profiles?: {
